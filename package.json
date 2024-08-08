@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "serve": "npx ts-node ./src/server.ts"
+    "serve": "rm -rf colleges.db && npx ts-node ./src/server.ts"
   },
   "devDependencies": {
     "ts-node": "^10.9.2",
