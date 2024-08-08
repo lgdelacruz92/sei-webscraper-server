@@ -8,6 +8,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -24,7 +35,9 @@ let taskInProgress = false;
 let taskProgress = 0;
 let taskCompleted = false;
 let collegeData = [];
+let collegeDataWithCode = [];
 const url = "https://bigfuture.collegeboard.org/college-search";
+const sleep = (ms) => __awaiter(void 0, void 0, void 0, function* () { return new Promise((resolve) => setTimeout(resolve, ms)); });
 function runPuppeteerTask() {
     return __awaiter(this, void 0, void 0, function* () {
         taskInProgress = true;
@@ -33,25 +46,27 @@ function runPuppeteerTask() {
         collegeData = [];
         const browser = yield puppeteer_extra_1.default.launch({ headless: false });
         const page = yield browser.newPage();
-        try {
-            yield page.goto(url, { waitUntil: "networkidle0" });
-            let previousChildCount = 0;
-            let newChildCount = 0;
-            do {
-                previousChildCount = yield page.evaluate(() => document.querySelectorAll(".cs-search-results-list-display .cs-college-card-container").length);
-                //   try {
+        yield page.goto(url, { waitUntil: "networkidle0" });
+        let isButtonVisible = true;
+        while (isButtonVisible) {
+            try {
                 yield page.waitForSelector('[data-testid="cs-show-more-results"]', {
                     timeout: 5000,
                 });
                 yield page.click('[data-testid="cs-show-more-results"]');
                 yield page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 200)));
-                //   } catch (e) {
-                //     console.log("no more show more button");
-                //     break;
-                //   }
-                newChildCount = yield page.evaluate(() => document.querySelectorAll(".cs-search-results-list-display .cs-college-card-container").length);
-                taskProgress = Math.min(100, Math.floor((newChildCount / 4300) * 100)); // Assuming a total of 5000 elements
-            } while (newChildCount > previousChildCount);
+                const progress = yield page.evaluate(() => document.querySelectorAll(".cs-search-results-list-display .cs-college-card-container").length);
+                yield sleep(500);
+                break;
+                taskProgress = Math.min(100, Math.floor((progress / 4300) * 100));
+                console.log("task progress", taskProgress);
+            }
+            catch (error) {
+                isButtonVisible = false;
+                console.log("Button no longer visible.");
+            }
+        }
+        try {
             collegeData = yield page.evaluate(() => {
                 return Array.from(document.querySelectorAll(".cs-college-card-container")).map((college) => {
                     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
@@ -79,13 +94,26 @@ function runPuppeteerTask() {
                     };
                 });
             });
+            collegeDataWithCode = [];
+            for (const d of collegeData) {
+                const { href } = d, rest = __rest(d, ["href"]);
+                yield page.goto(href, { waitUntil: "networkidle0" });
+                yield page.waitForSelector('[data-testid="csp-more-about-college-board-code-valueId"]', {
+                    timeout: 5000,
+                });
+                const code = yield page.evaluate(() => {
+                    return document.querySelector('[data-testid="csp-more-about-college-board-code-valueId"]').innerHTML;
+                });
+                yield sleep(500);
+                collegeDataWithCode.push(Object.assign(Object.assign({}, rest), { href, code }));
+            }
         }
         catch (error) {
             console.error("Error running Puppeteer task:", error);
             throw error; // Propagate error to handle it in the caller
         }
         finally {
-            console.log("college data length", collegeData.length);
+            console.log("college data length", collegeDataWithCode.length);
             yield browser.close();
             taskInProgress = false;
             taskCompleted = true;

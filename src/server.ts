@@ -1,13 +1,17 @@
 import express, { Request, Response } from "express";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
-
+import bodyParser from "body-parser";
 import cors from "cors";
 
 puppeteer.use(StealthPlugin());
 const app = express();
 const port = 4000;
 app.use(cors());
+app.use(bodyParser.json());
+
+// Alternatively, for parsing URL-encoded data
+app.use(bodyParser.urlencoded({ extended: true }));
 
 interface CollegeData {
   name: string;
@@ -20,6 +24,7 @@ interface CollegeData {
   graduationRate: string;
   averageCost: string;
   satRange: string;
+  code?: string;
 }
 
 let taskInProgress = false;
@@ -31,6 +36,49 @@ const url = "https://bigfuture.collegeboard.org/college-search";
 
 const sleep = async (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
+
+let collegeDataWithCode: CollegeData[] = [];
+
+async function runGetSchoolCodesTask(
+  collegeData: CollegeData[]
+): Promise<void> {
+  taskInProgress = true;
+  taskCompleted = false;
+  taskProgress = 0;
+  collegeDataWithCode = [];
+  const browser = await puppeteer.launch({ headless: true });
+  const page = await browser.newPage();
+
+  let i = 0;
+  for (const d of collegeData) {
+    try {
+      const { href, ...rest } = d;
+      await page.goto(href, { waitUntil: "networkidle0" });
+      await page.waitForSelector(
+        '[data-testid="csp-more-about-college-board-code-valueId"]',
+        {
+          timeout: 5000,
+        }
+      );
+      const code = await page.evaluate(
+        () =>
+          document.querySelector(
+            '[data-testid="csp-more-about-college-board-code-valueId"]'
+          ).innerHTML
+      );
+      await sleep(500);
+      console.log("getting school code for ", rest.name);
+      collegeDataWithCode.push({ ...rest, href, code });
+      taskProgress = Math.min(100, Math.floor((i / collegeData.length) * 100));
+      i += 1;
+    } catch (e) {
+      console.log(`error in ${d}. Skipping...`);
+    }
+  }
+  await browser.close();
+  taskInProgress = false;
+  taskCompleted = true;
+}
 
 async function runPuppeteerTask(): Promise<void> {
   taskInProgress = true;
@@ -60,6 +108,7 @@ async function runPuppeteerTask(): Promise<void> {
           ).length
       );
       await sleep(500);
+      break;
       taskProgress = Math.min(100, Math.floor((progress / 4300) * 100));
       console.log("task progress", taskProgress);
     } catch (error) {
@@ -162,6 +211,35 @@ app.post("/start-task", async (req: Request, res: Response) => {
   }
 });
 
+app.post("/get-school-codes", async (req: Request, res: Response) => {
+  const { data } = req.body;
+  if (taskInProgress) {
+    return res.status(400).json({ message: "Task is already in progress." });
+  }
+
+  try {
+    runGetSchoolCodesTask(data).catch((error) => {
+      console.error("Puppeteer task failed:", error);
+      taskInProgress = false;
+      taskCompleted = false;
+    });
+
+    res.json({ message: "School codes started" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to start task", error });
+  }
+});
+
+// Endpoint to get progress
+app.get("/school-codes-progress", (req: Request, res: Response) => {
+  res.json({
+    inProgress: taskInProgress,
+    progress: taskProgress,
+    completed: taskCompleted,
+    data: taskCompleted ? collegeDataWithCode : [],
+  });
+});
+
 // Endpoint to get progress
 app.get("/progress", (req: Request, res: Response) => {
   res.json({
@@ -176,12 +254,12 @@ app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
 
-// const main = async () => {
-//   await runPuppeteerTask().catch((error) => {
-//     console.error("Puppeteer task failed:", error);
-//     taskInProgress = false;
-//     taskCompleted = false;
-//   });
-// };
+const main = async () => {
+  //   await runPuppeteerTask().catch((error) => {
+  //     console.error("Puppeteer task failed:", error);
+  //     taskInProgress = false;
+  //     taskCompleted = false;
+  //   });
+};
 
-// main();
+main();
