@@ -1,8 +1,13 @@
 import express, { Request, Response } from "express";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
 
+import cors from "cors";
+
+puppeteer.use(StealthPlugin());
 const app = express();
 const port = 4000;
+app.use(cors());
 
 interface CollegeData {
   name: string;
@@ -24,6 +29,9 @@ let collegeData: CollegeData[] = [];
 
 const url = "https://bigfuture.collegeboard.org/college-search";
 
+const sleep = async (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 async function runPuppeteerTask(): Promise<void> {
   taskInProgress = true;
   taskCompleted = false;
@@ -33,40 +41,33 @@ async function runPuppeteerTask(): Promise<void> {
   const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
 
+  await page.goto(url, { waitUntil: "networkidle0" });
+  let isButtonVisible = true;
+
+  while (isButtonVisible) {
+    try {
+      await page.waitForSelector('[data-testid="cs-show-more-results"]', {
+        timeout: 5000,
+      });
+      await page.click('[data-testid="cs-show-more-results"]');
+      await page.evaluate(
+        () => new Promise((resolve) => setTimeout(resolve, 200))
+      );
+      const progress = await page.evaluate(
+        () =>
+          document.querySelectorAll(
+            ".cs-search-results-list-display .cs-college-card-container"
+          ).length
+      );
+      await sleep(500);
+      taskProgress = Math.min(100, Math.floor((progress / 4300) * 100));
+      console.log("task progress", taskProgress);
+    } catch (error) {
+      isButtonVisible = false;
+      console.log("Button no longer visible.");
+    }
+  }
   try {
-    await page.goto(url, { waitUntil: "networkidle0" });
-
-    let previousChildCount = 0;
-    let newChildCount = 0;
-
-    do {
-      previousChildCount = await page.evaluate(
-        () =>
-          document.querySelectorAll(
-            ".cs-search-results-list-display .cs-college-card-container"
-          ).length
-      );
-
-      try {
-        await page.click('[data-testid="cs-show-more-results"]');
-        await page.evaluate(
-          () => new Promise((resolve) => setTimeout(resolve, 200))
-        );
-      } catch (e) {
-        console.log("no more show more button");
-        break;
-      }
-
-      newChildCount = await page.evaluate(
-        () =>
-          document.querySelectorAll(
-            ".cs-search-results-list-display .cs-college-card-container"
-          ).length
-      );
-
-      taskProgress = Math.min(100, Math.floor((newChildCount / 4300) * 100)); // Assuming a total of 5000 elements
-    } while (newChildCount > previousChildCount);
-
     collegeData = await page.evaluate(() => {
       return Array.from(
         document.querySelectorAll(".cs-college-card-container")
@@ -136,6 +137,7 @@ async function runPuppeteerTask(): Promise<void> {
     console.error("Error running Puppeteer task:", error);
     throw error; // Propagate error to handle it in the caller
   } finally {
+    console.log("college data length", collegeData.length);
     await browser.close();
     taskInProgress = false;
     taskCompleted = true;
@@ -173,3 +175,13 @@ app.get("/progress", (req: Request, res: Response) => {
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
+
+// const main = async () => {
+//   await runPuppeteerTask().catch((error) => {
+//     console.error("Puppeteer task failed:", error);
+//     taskInProgress = false;
+//     taskCompleted = false;
+//   });
+// };
+
+// main();

@@ -8,7 +8,7 @@
       "type": "node",
       "request": "launch",
       "name": "Launch TypeScript with ts-node",
-      "program": "${workspaceFolder}/src/puppeteer.ts",
+      "program": "${workspaceFolder}/src/server.ts",
       "preLaunchTask": "tsc: build - tsconfig.json",
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "runtimeArgs": ["-r", "ts-node/register"],

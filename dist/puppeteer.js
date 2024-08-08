@@ -8,11 +8,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getHtml = void 0;
-const puppeteer_1 = require("puppeteer");
+const puppeteer_1 = __importDefault(require("puppeteer"));
 const getHtml = (url_1, ...args_1) => __awaiter(void 0, [url_1, ...args_1], void 0, function* (url, fromGetCode = false) {
-    const browser = yield puppeteer_1.default.launch({ headless: false });
+    const browser = yield puppeteer_1.default.launch();
     const page = yield browser.newPage();
     yield page.goto(url, { waitUntil: "networkidle0" });
     const allColleges = [];
@@ -23,6 +26,7 @@ const getHtml = (url_1, ...args_1) => __awaiter(void 0, [url_1, ...args_1], void
             let _offset = 15;
             while (isButtonVisible) {
                 try {
+                    console.log(`fetching ${_start} to ${_offset}`);
                     const collegesNodes = yield page.evaluate((start, offset) => {
                         const collegesNodeList = Array.from(document.querySelectorAll(`.cs-search-results-list-display .cs-college-card-outer-container:nth-child(n+${start}):nth-child(-n+${start + offset})`));
                         console.log("selected nodes", collegesNodeList.length);
@@ -49,14 +53,17 @@ const getHtml = (url_1, ...args_1) => __awaiter(void 0, [url_1, ...args_1], void
         yield clickButtonWhileVisible();
     }
     // Get the HTML content after the page has fully rendered
-    const html = yield page.content();
+    //   const html = await page.content();
     yield browser.close();
-    return html;
+    return allColleges;
 });
 exports.getHtml = getHtml;
 const main = () => __awaiter(void 0, void 0, void 0, function* () {
-    console.log("hello");
-    yield (0, exports.getHtml)("https://bigfuture.collegeboard.org/college-search");
+    const start = new Date().getTime();
+    const result = yield (0, exports.getHtml)("https://bigfuture.collegeboard.org/college-search");
+    const end = new Date().getTime();
+    console.log("time: ", end - start);
+    console.log(result);
 });
 main();
 //# sourceMappingURL=puppeteer.js.map
