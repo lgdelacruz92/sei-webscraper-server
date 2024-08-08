@@ -3,6 +3,7 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import bodyParser from "body-parser";
 import cors from "cors";
+import { insertCollege } from "./db";
 
 puppeteer.use(StealthPlugin());
 const app = express();
@@ -52,7 +53,7 @@ async function runGetSchoolCodesTask(
   let i = 0;
   for (const d of collegeData) {
     try {
-      const { href, ...rest } = d;
+      const { href, name, address, ...rest } = d;
       await page.goto(href, { waitUntil: "networkidle0" });
       await page.waitForSelector(
         '[data-testid="csp-more-about-college-board-code-valueId"]',
@@ -67,8 +68,10 @@ async function runGetSchoolCodesTask(
           ).innerHTML
       );
       await sleep(500);
-      console.log("getting school code for ", rest.name);
-      collegeDataWithCode.push({ ...rest, href, code });
+      console.log("getting school code for ", name);
+      collegeDataWithCode.push({ ...rest, name, address, href, code });
+      const [city, state] = address.split(",").map((e) => e.trim());
+      insertCollege(name, city, state, code, href);
       taskProgress = Math.min(100, Math.floor((i / collegeData.length) * 100));
       i += 1;
     } catch (e) {
@@ -78,6 +81,7 @@ async function runGetSchoolCodesTask(
   await browser.close();
   taskInProgress = false;
   taskCompleted = true;
+  taskProgress = 100;
 }
 
 async function runPuppeteerTask(): Promise<void> {
