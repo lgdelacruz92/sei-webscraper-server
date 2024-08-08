@@ -194,6 +194,7 @@ async function runPuppeteerTask(): Promise<void> {
     await browser.close();
     taskInProgress = false;
     taskCompleted = true;
+    taskProgress = 100;
   }
 }
 
