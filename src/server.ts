@@ -3,7 +3,7 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import bodyParser from "body-parser";
 import cors from "cors";
-import { insertCollege } from "./db";
+import { getCollegesByPage, insertCollege } from "./db";
 
 puppeteer.use(StealthPlugin());
 const app = express();
@@ -252,6 +252,13 @@ app.get("/progress", (req: Request, res: Response) => {
     completed: taskCompleted,
     data: taskCompleted ? collegeData : [],
   });
+});
+
+// Endpoint to get progress
+app.get("/getColleges", (req: Request, res: Response) => {
+  const { page, pageSize } = req.query;
+  const colleges = getCollegesByPage(page, pageSize);
+  res.json({ page, pageSize, ...colleges });
 });
 
 app.listen(port, () => {
