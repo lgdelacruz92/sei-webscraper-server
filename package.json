@@ -1,9 +1,13 @@
 {
+  "scripts": {
+    "serve": "npx ts-node ./src/server.ts"
+  },
   "devDependencies": {
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4"
   },
   "dependencies": {
+    "express": "^4.19.2",
     "puppeteer": "^23.0.1"
   }
 }
