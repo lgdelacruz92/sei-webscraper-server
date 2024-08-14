@@ -9,8 +9,7 @@ puppeteer.use(StealthPlugin());
 const app = express();
 const port = 4000;
 app.use(cors());
-app.use(bodyParser.json());
-
+app.use(bodyParser.json({ limit: "5mb" }));
 // Alternatively, for parsing URL-encoded data
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -18,13 +17,13 @@ interface CollegeData {
   name: string;
   href: string;
   address: string;
-  schoolType: string;
-  designation: string;
-  size: string;
-  setting: string;
-  graduationRate: string;
-  averageCost: string;
-  satRange: string;
+  // schoolType: string;
+  // designation: string;
+  // size: string;
+  // setting: string;
+  // graduationRate: string;
+  // averageCost: string;
+  // satRange: string;
   code?: string;
 }
 
@@ -50,11 +49,17 @@ async function runGetSchoolCodesTask(
   const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
 
+  await page.setRequestInterception(true);
+  page.on("request", (request) => {
+    if (request.resourceType() === "image") request.abort();
+    else request.continue();
+  });
+
   let i = 0;
   for (const d of collegeData) {
     try {
       const { href, name, address, ...rest } = d;
-      await page.goto(href, { waitUntil: "networkidle0" });
+      await page.goto(href, { waitUntil: "domcontentloaded" });
       await page.waitForSelector(
         '[data-testid="csp-more-about-college-board-code-valueId"]',
         {
@@ -93,7 +98,13 @@ async function runPuppeteerTask(): Promise<void> {
   const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
 
-  await page.goto(url, { waitUntil: "networkidle0" });
+  await page.setRequestInterception(true);
+  page.on("request", (request) => {
+    if (request.resourceType() === "image") request.abort();
+    else request.continue();
+  });
+
+  await page.goto(url, { waitUntil: "domcontentloaded" });
   let isButtonVisible = true;
 
   while (isButtonVisible) {
@@ -176,13 +187,13 @@ async function runPuppeteerTask(): Promise<void> {
           name,
           href,
           address,
-          schoolType,
-          designation,
-          size,
-          setting,
-          graduationRate,
-          averageCost,
-          satRange,
+          // schoolType,
+          // designation,
+          // size,
+          // setting,
+          // graduationRate,
+          // averageCost,
+          // satRange,
         };
       });
     });
@@ -266,12 +277,12 @@ app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
 
-const main = async () => {
-  //   await runPuppeteerTask().catch((error) => {
-  //     console.error("Puppeteer task failed:", error);
-  //     taskInProgress = false;
-  //     taskCompleted = false;
-  //   });
-};
+// const main = async () => {
+//   await runPuppeteerTask().catch((error) => {
+//     console.error("Puppeteer task failed:", error);
+//     taskInProgress = false;
+//     taskCompleted = false;
+//   });
+// };
 
-main();
+// main();
