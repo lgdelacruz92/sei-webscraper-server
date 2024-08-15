@@ -123,7 +123,7 @@ async function runPuppeteerTask(): Promise<void> {
           ).length
       );
       await sleep(500);
-      //   break;
+      break;
       taskProgress = Math.min(100, Math.floor((progress / 4300) * 100));
       console.log("task progress", taskProgress);
     } catch (error) {
